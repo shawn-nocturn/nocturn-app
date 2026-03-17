@@ -16,6 +16,16 @@ export default async function DashboardLayout({
     redirect("/login");
   }
 
+  // Check if user has any collectives — if not, redirect to onboarding
+  const { count } = await supabase
+    .from("collective_members")
+    .select("*", { count: "exact", head: true })
+    .eq("user_id", user.id);
+
+  if (!count || count === 0) {
+    redirect("/onboarding");
+  }
+
   // Fetch user profile
   const { data: profile } = await supabase
     .from("users")

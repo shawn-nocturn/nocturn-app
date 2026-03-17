@@ -28,6 +28,8 @@ export default function OnboardingPage() {
   const [slug, setSlug] = useState("");
   const [bio, setBio] = useState("");
   const [city, setCity] = useState("");
+  const [instagram, setInstagram] = useState("");
+  const [website, setWebsite] = useState("");
   const [error, setError] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
 
@@ -54,7 +56,7 @@ export default function OnboardingPage() {
     // Create the collective
     const { data: collective, error: collectiveError } = await supabase
       .from("collectives")
-      .insert({ name, slug, bio: bio || null, city })
+      .insert({ name, slug, bio: bio || null, city, instagram: instagram || null, website: website || null })
       .select()
       .single();
 
@@ -143,6 +145,25 @@ export default function OnboardingPage() {
                   value={city}
                   onChange={(e) => setCity(e.target.value)}
                   required
+                />
+              </div>
+              <div className="space-y-2">
+                <Label htmlFor="instagram">Instagram (optional)</Label>
+                <Input
+                  id="instagram"
+                  placeholder="@yourcollective"
+                  value={instagram}
+                  onChange={(e) => setInstagram(e.target.value)}
+                />
+              </div>
+              <div className="space-y-2">
+                <Label htmlFor="website">Website (optional)</Label>
+                <Input
+                  id="website"
+                  type="url"
+                  placeholder="https://yourcollective.com"
+                  value={website}
+                  onChange={(e) => setWebsite(e.target.value)}
                 />
               </div>
               {error && (
