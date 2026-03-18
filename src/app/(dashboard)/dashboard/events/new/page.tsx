@@ -2,7 +2,7 @@
 
 import { useState } from "react";
 import { useRouter } from "next/navigation";
-import { createClient } from "@/lib/supabase/client";
+import { createEvent } from "@/app/actions/events";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -31,7 +31,6 @@ interface TicketTierInput {
 
 export default function NewEventPage() {
   const router = useRouter();
-  const supabase = createClient();
 
   // Step tracking
   const [step, setStep] = useState(1);
@@ -81,105 +80,33 @@ export default function NewEventPage() {
     setError(null);
     setLoading(true);
 
-    const {
-      data: { user },
-    } = await supabase.auth.getUser();
-    if (!user) {
-      setError("You must be logged in.");
+    const validTiers = tiers
+      .filter((t) => t.name && t.price && t.quantity)
+      .map((t) => ({
+        name: t.name,
+        price: parseFloat(t.price),
+        quantity: parseInt(t.quantity),
+      }));
+
+    const result = await createEvent({
+      title,
+      slug,
+      description: description || null,
+      date,
+      doorsOpen: doorsOpen || null,
+      startTime,
+      endTime: endTime || null,
+      venueName,
+      venueAddress,
+      venueCity,
+      venueCapacity: parseInt(venueCapacity) || 0,
+      tiers: validTiers,
+    });
+
+    if (result.error) {
+      setError(result.error);
       setLoading(false);
       return;
-    }
-
-    // Get user's first collective
-    const { data: memberships } = await supabase
-      .from("collective_members")
-      .select("collective_id")
-      .eq("user_id", user.id)
-      .limit(1);
-
-    if (!memberships || memberships.length === 0) {
-      setError("No collective found. Please create one first.");
-      setLoading(false);
-      return;
-    }
-
-    const collectiveId = memberships[0].collective_id;
-
-    // Create or find venue
-    let venueId: string;
-    const { data: existingVenue } = await supabase
-      .from("venues")
-      .select("id")
-      .eq("name", venueName)
-      .eq("city", venueCity)
-      .limit(1)
-      .maybeSingle();
-
-    if (existingVenue) {
-      venueId = existingVenue.id;
-    } else {
-      const { data: newVenue, error: venueError } = await supabase
-        .from("venues")
-        .insert({
-          name: venueName,
-          address: venueAddress,
-          city: venueCity,
-          capacity: parseInt(venueCapacity) || 0,
-        })
-        .select("id")
-        .single();
-
-      if (venueError) {
-        setError(`Venue error: ${venueError.message}`);
-        setLoading(false);
-        return;
-      }
-      venueId = newVenue.id;
-    }
-
-    // Create event
-    const { data: event, error: eventError } = await supabase
-      .from("events")
-      .insert({
-        collective_id: collectiveId,
-        venue_id: venueId,
-        title,
-        slug,
-        description: description || null,
-        date,
-        doors_open: doorsOpen || null,
-        start_time: startTime,
-        end_time: endTime || null,
-        status: "draft",
-        capacity: parseInt(venueCapacity) || 0,
-      })
-      .select("id")
-      .single();
-
-    if (eventError) {
-      setError(`Event error: ${eventError.message}`);
-      setLoading(false);
-      return;
-    }
-
-    // Create ticket tiers
-    const validTiers = tiers.filter((t) => t.name && t.price && t.quantity);
-    if (validTiers.length > 0) {
-      const { error: tierError } = await supabase.from("ticket_tiers").insert(
-        validTiers.map((t, i) => ({
-          event_id: event.id,
-          name: t.name,
-          price: parseFloat(t.price) * 100, // Store in cents
-          quantity: parseInt(t.quantity),
-          sold: 0,
-          sort_order: i,
-        }))
-      );
-
-      if (tierError) {
-        console.error("Ticket tier error:", tierError);
-        // Non-blocking — event already created
-      }
     }
 
     router.push("/dashboard/events");

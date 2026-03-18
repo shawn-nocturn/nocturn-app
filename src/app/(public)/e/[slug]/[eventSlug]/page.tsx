@@ -1,9 +1,18 @@
-import { createClient } from "@/lib/supabase/server";
+import { createClient as createServerClient } from "@/lib/supabase/server";
+import { createClient } from "@supabase/supabase-js";
 import { notFound } from "next/navigation";
-import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
-import { Calendar, Clock, MapPin, Users, Ticket } from "lucide-react";
+import { Calendar, Clock, MapPin } from "lucide-react";
+import { TicketPurchase } from "@/components/ticket-purchase";
 import type { Metadata } from "next";
+
+function createAdminClient() {
+  return createClient(
+    process.env.NEXT_PUBLIC_SUPABASE_URL!,
+    process.env.SUPABASE_SERVICE_ROLE_KEY!,
+    { auth: { autoRefreshToken: false, persistSession: false } }
+  );
+}
 
 interface Props {
   params: Promise<{ slug: string; eventSlug: string }>;
@@ -11,7 +20,7 @@ interface Props {
 
 export async function generateMetadata({ params }: Props): Promise<Metadata> {
   const { slug, eventSlug } = await params;
-  const supabase = await createClient();
+  const supabase = createAdminClient();
 
   const { data: collective } = await supabase
     .from("collectives")
@@ -23,7 +32,7 @@ export async function generateMetadata({ params }: Props): Promise<Metadata> {
 
   const { data: event } = await supabase
     .from("events")
-    .select("title, description, cover_image_url")
+    .select("title, description, flyer_url")
     .eq("collective_id", collective.id)
     .eq("slug", eventSlug)
     .single();
@@ -36,14 +45,14 @@ export async function generateMetadata({ params }: Props): Promise<Metadata> {
     openGraph: {
       title: event.title,
       description: event.description || `Event by ${collective.name}`,
-      ...(event.cover_image_url && { images: [event.cover_image_url] }),
+      ...(event.flyer_url && { images: [event.flyer_url] }),
     },
   };
 }
 
 export default async function PublicEventPage({ params }: Props) {
   const { slug, eventSlug } = await params;
-  const supabase = await createClient();
+  const supabase = createAdminClient();
 
   // Fetch collective
   const { data: collective } = await supabase
@@ -86,17 +95,19 @@ export default async function PublicEventPage({ params }: Props) {
     capacity: number;
   } | null;
 
-  const eventDate = new Date(event.date);
+  const eventDate = new Date(event.starts_at);
+  const endsAt = event.ends_at ? new Date(event.ends_at) : null;
+  const doorsAt = event.doors_at ? new Date(event.doors_at) : null;
   const isUpcoming = eventDate >= new Date() && event.status === "published";
 
   return (
     <div className="min-h-screen bg-background">
       {/* Hero */}
       <div className="relative">
-        {event.cover_image_url ? (
+        {event.flyer_url ? (
           <div
             className="h-64 bg-cover bg-center sm:h-80"
-            style={{ backgroundImage: `url(${event.cover_image_url})` }}
+            style={{ backgroundImage: `url(${event.flyer_url})` }}
           >
             <div className="absolute inset-0 bg-gradient-to-t from-background to-transparent" />
           </div>
@@ -135,9 +146,9 @@ export default async function PublicEventPage({ params }: Props) {
             </span>
             <span className="flex items-center gap-1.5">
               <Clock className="h-4 w-4 text-nocturn" />
-              {event.doors_open && `Doors ${event.doors_open} · `}
-              Start {event.start_time}
-              {event.end_time && ` · End ${event.end_time}`}
+              {doorsAt && `Doors ${doorsAt.toLocaleTimeString("en", { hour: "numeric", minute: "2-digit" })} · `}
+              Start {eventDate.toLocaleTimeString("en", { hour: "numeric", minute: "2-digit" })}
+              {endsAt && ` · End ${endsAt.toLocaleTimeString("en", { hour: "numeric", minute: "2-digit" })}`}
             </span>
           </div>
 
@@ -197,51 +208,17 @@ export default async function PublicEventPage({ params }: Props) {
             </Card>
           )}
 
-          {/* Ticket tiers */}
-          {tiers && tiers.length > 0 && (
-            <div className="space-y-3">
-              <h2 className="text-sm font-semibold uppercase tracking-wider text-muted-foreground">
-                Tickets
-              </h2>
-              {tiers.map((tier) => {
-                const soldOut = tier.sold >= tier.quantity;
-                return (
-                  <Card
-                    key={tier.id}
-                    className={soldOut ? "opacity-60" : ""}
-                  >
-                    <CardContent className="flex items-center justify-between p-4">
-                      <div>
-                        <p className="font-medium">{tier.name}</p>
-                        <p className="text-xs text-muted-foreground">
-                          {soldOut
-                            ? "Sold out"
-                            : `${tier.quantity - tier.sold} remaining`}
-                        </p>
-                      </div>
-                      <div className="text-right">
-                        <p className="text-lg font-bold text-nocturn">
-                          ${(tier.price / 100).toFixed(2)}
-                        </p>
-                      </div>
-                    </CardContent>
-                  </Card>
-                );
-              })}
-            </div>
-          )}
-
-          {/* CTA */}
-          {isUpcoming && (
-            <div className="sticky bottom-4 pt-4">
-              <Button
-                className="w-full bg-nocturn py-6 text-lg hover:bg-nocturn-light"
-                size="lg"
-              >
-                <Ticket className="mr-2 h-5 w-5" />
-                Get Tickets
-              </Button>
-            </div>
+          {/* Ticket tiers + purchase */}
+          {isUpcoming && tiers && tiers.length > 0 && (
+            <TicketPurchase
+              tiers={tiers.map((t) => ({
+                id: t.id,
+                name: t.name,
+                price: Number(t.price),
+                capacity: t.capacity,
+              }))}
+              eventId={event.id}
+            />
           )}
 
           {event.status === "cancelled" && (

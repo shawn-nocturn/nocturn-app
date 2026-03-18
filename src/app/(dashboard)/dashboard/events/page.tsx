@@ -23,26 +23,26 @@ export default async function EventsPage() {
     id: string;
     title: string;
     slug: string;
-    date: string;
+    starts_at: string;
     status: string;
-    cover_image_url: string | null;
+    flyer_url: string | null;
     venues: { name: string; city: string } | null;
   }> = [];
 
   if (collectiveIds.length > 0) {
     const { data } = await supabase
       .from("events")
-      .select("id, title, slug, date, status, cover_image_url, venues(name, city)")
+      .select("id, title, slug, starts_at, status, flyer_url, venues(name, city)")
       .in("collective_id", collectiveIds)
-      .order("date", { ascending: false });
+      .order("starts_at", { ascending: false });
     events = (data ?? []) as unknown as typeof events;
   }
 
   const upcoming = events.filter(
-    (e) => e.status !== "completed" && e.status !== "cancelled" && new Date(e.date) >= new Date()
+    (e) => e.status !== "completed" && e.status !== "cancelled" && new Date(e.starts_at) >= new Date()
   );
   const past = events.filter(
-    (e) => e.status === "completed" || new Date(e.date) < new Date()
+    (e) => e.status === "completed" || new Date(e.starts_at) < new Date()
   );
 
   return (
@@ -116,12 +116,12 @@ function EventCard({
   event: {
     id: string;
     title: string;
-    date: string;
+    starts_at: string;
     status: string;
     venues: { name: string; city: string } | null;
   };
 }) {
-  const date = new Date(event.date);
+  const date = new Date(event.starts_at);
   const statusColors: Record<string, string> = {
     draft: "bg-yellow-500/10 text-yellow-500",
     published: "bg-green-500/10 text-green-500",
