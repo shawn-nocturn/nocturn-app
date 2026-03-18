@@ -15,6 +15,7 @@ import {
   Calendar,
   Sparkles,
   DollarSign,
+  Users,
   Settings,
   LogOut,
 } from "lucide-react";
@@ -30,6 +31,7 @@ const navItems = [
   { href: "/dashboard/events", label: "Events", icon: Calendar },
   { href: "/dashboard/marketing", label: "Marketing", icon: Sparkles },
   { href: "/dashboard/finance", label: "Finance", icon: DollarSign },
+  { href: "/dashboard/members", label: "Members", icon: Users },
   { href: "/dashboard/settings", label: "Settings", icon: Settings },
 ];
 
