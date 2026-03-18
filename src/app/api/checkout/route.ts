@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { createClient } from "@supabase/supabase-js";
-import { stripe, PLATFORM_FEE_PERCENT } from "@/lib/stripe";
+import { getStripe, PLATFORM_FEE_PERCENT } from "@/lib/stripe";
 
 function createAdminClient() {
   return createClient(
@@ -123,7 +123,7 @@ export async function POST(request: NextRequest) {
     const applicationFee = Math.round(totalCents * (PLATFORM_FEE_PERCENT / 100));
 
     // Create Stripe Checkout Session
-    const session = await stripe.checkout.sessions.create({
+    const session = await getStripe().checkout.sessions.create({
       mode: "payment",
       customer_email: buyerEmail,
       line_items: [

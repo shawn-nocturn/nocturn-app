@@ -1,7 +1,7 @@
 "use server";
 
 import { createClient } from "@supabase/supabase-js";
-import { stripe } from "@/lib/stripe";
+import { getStripe } from "@/lib/stripe";
 
 function createAdminClient() {
   return createClient(
@@ -33,7 +33,7 @@ export async function createConnectAccount(collectiveId: string) {
 
   // Create a new Express account if one doesn't exist
   if (!accountId) {
-    const account = await stripe.accounts.create({
+    const account = await getStripe().accounts.create({
       type: "express",
       metadata: { collective_id: collectiveId },
       business_profile: {
@@ -55,7 +55,7 @@ export async function createConnectAccount(collectiveId: string) {
 
   // Create an Account Link for onboarding
   const appUrl = process.env.NEXT_PUBLIC_APP_URL!;
-  const accountLink = await stripe.accountLinks.create({
+  const accountLink = await getStripe().accountLinks.create({
     account: accountId,
     refresh_url: `${appUrl}/dashboard/settings?stripe=refresh`,
     return_url: `${appUrl}/api/stripe/connect/callback`,
@@ -81,7 +81,7 @@ export async function getConnectAccountStatus(collectiveId: string) {
     return { hasAccount: false, chargesEnabled: false, payoutsEnabled: false };
   }
 
-  const account = await stripe.accounts.retrieve(
+  const account = await getStripe().accounts.retrieve(
     collective.stripe_account_id
   );
 
@@ -108,7 +108,7 @@ export async function createConnectLoginLink(collectiveId: string) {
     return { error: "No Stripe account found" };
   }
 
-  const loginLink = await stripe.accounts.createLoginLink(
+  const loginLink = await getStripe().accounts.createLoginLink(
     collective.stripe_account_id
   );
 
