@@ -1,0 +1,158 @@
+"use server";
+
+import { createClient } from "@supabase/supabase-js";
+
+function createAdminClient() {
+  return createClient(
+    process.env.NEXT_PUBLIC_SUPABASE_URL!,
+    process.env.SUPABASE_SERVICE_ROLE_KEY!,
+    { auth: { autoRefreshToken: false, persistSession: false } }
+  );
+}
+
+export interface PromoCode {
+  id: string;
+  event_id: string;
+  code: string;
+  discount_type: "percentage" | "fixed";
+  discount_value: number;
+  max_uses: number | null;
+  current_uses: number;
+  promoter_id: string | null;
+  expires_at: string | null;
+  is_active: boolean;
+  created_at: string;
+}
+
+export async function createPromoCode(input: {
+  eventId: string;
+  code: string;
+  discountType: "percentage" | "fixed";
+  discountValue: number;
+  maxUses?: number | null;
+  promoterId?: string | null;
+  expiresAt?: string | null;
+}) {
+  const supabase = createAdminClient();
+
+  // Check for duplicate code on this event
+  const { data: existing } = await supabase
+    .from("promo_codes")
+    .select("id")
+    .eq("event_id", input.eventId)
+    .ilike("code", input.code)
+    .single();
+
+  if (existing) {
+    return { error: "A promo code with this name already exists for this event" };
+  }
+
+  const { error } = await supabase.from("promo_codes").insert({
+    event_id: input.eventId,
+    code: input.code.toUpperCase().trim(),
+    discount_type: input.discountType,
+    discount_value: input.discountValue,
+    max_uses: input.maxUses ?? null,
+    current_uses: 0,
+    promoter_id: input.promoterId ?? null,
+    expires_at: input.expiresAt ?? null,
+    is_active: true,
+  });
+
+  if (error) return { error: error.message };
+  return { error: null };
+}
+
+export async function getPromoCodes(eventId: string): Promise<PromoCode[]> {
+  const supabase = createAdminClient();
+
+  const { data, error } = await supabase
+    .from("promo_codes")
+    .select("*")
+    .eq("event_id", eventId)
+    .order("created_at", { ascending: false });
+
+  if (error) {
+    console.error("[promo-codes] Failed to fetch:", error);
+    return [];
+  }
+
+  return (data ?? []) as PromoCode[];
+}
+
+export async function validatePromoCode(eventId: string, code: string) {
+  const supabase = createAdminClient();
+
+  const { data, error } = await supabase
+    .from("promo_codes")
+    .select("*")
+    .eq("event_id", eventId)
+    .ilike("code", code.trim())
+    .eq("is_active", true)
+    .single();
+
+  if (error || !data) {
+    return { valid: false, error: "Invalid promo code", discount: null };
+  }
+
+  const promo = data as PromoCode;
+
+  // Check expiry
+  if (promo.expires_at && new Date(promo.expires_at) < new Date()) {
+    return { valid: false, error: "This promo code has expired", discount: null };
+  }
+
+  // Check usage limit
+  if (promo.max_uses !== null && promo.current_uses >= promo.max_uses) {
+    return { valid: false, error: "This promo code has reached its usage limit", discount: null };
+  }
+
+  return {
+    valid: true,
+    error: null,
+    discount: {
+      id: promo.id,
+      code: promo.code,
+      discountType: promo.discount_type,
+      discountValue: promo.discount_value,
+    },
+  };
+}
+
+export async function applyPromoCode(codeId: string) {
+  const supabase = createAdminClient();
+
+  const { error } = await supabase.rpc("increment_promo_uses", { code_id: codeId });
+
+  // Fallback: manual increment if RPC doesn't exist
+  if (error) {
+    const { data: current } = await supabase
+      .from("promo_codes")
+      .select("current_uses")
+      .eq("id", codeId)
+      .single();
+
+    if (!current) return { error: "Promo code not found" };
+
+    const { error: updateError } = await supabase
+      .from("promo_codes")
+      .update({ current_uses: (current.current_uses ?? 0) + 1 })
+      .eq("id", codeId);
+
+    if (updateError) return { error: updateError.message };
+  }
+
+  return { error: null };
+}
+
+export async function togglePromoCode(codeId: string, isActive: boolean) {
+  const supabase = createAdminClient();
+
+  const { error } = await supabase
+    .from("promo_codes")
+    .update({ is_active: isActive })
+    .eq("id", codeId);
+
+  if (error) return { error: error.message };
+  return { error: null };
+}

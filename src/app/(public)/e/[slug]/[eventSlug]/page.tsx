@@ -39,13 +39,28 @@ export async function generateMetadata({ params }: Props): Promise<Metadata> {
 
   if (!event) return { title: "Event Not Found" };
 
+  const title = `${event.title} | ${collective.name} — Nocturn`;
+  const description = event.description || `Event by ${collective.name}`;
+  const canonicalUrl = `${process.env.NEXT_PUBLIC_APP_URL || "https://nocturn.app"}/e/${slug}/${eventSlug}`;
+
   return {
-    title: `${event.title} | ${collective.name} — Nocturn`,
-    description: event.description || `Event by ${collective.name}`,
+    title,
+    description,
     openGraph: {
       title: event.title,
-      description: event.description || `Event by ${collective.name}`,
+      description,
+      type: "website",
+      url: canonicalUrl,
+      ...(event.flyer_url && { images: [{ url: event.flyer_url, width: 1200, height: 630, alt: event.title }] }),
+    },
+    twitter: {
+      card: "summary_large_image",
+      title: event.title,
+      description,
       ...(event.flyer_url && { images: [event.flyer_url] }),
+    },
+    alternates: {
+      canonical: canonicalUrl,
     },
   };
 }

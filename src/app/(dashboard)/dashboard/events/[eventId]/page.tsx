@@ -16,6 +16,8 @@ import {
   Ticket,
   ScanLine,
   ListChecks,
+  Tag,
+  ClipboardList,
 } from "lucide-react";
 import Link from "next/link";
 import { EventStatusActions } from "./event-status-actions";
@@ -180,6 +182,18 @@ export default async function EventDetailPage({ params }: Props) {
             </Button>
           </Link>
         )}
+        <Link href={`/dashboard/events/${event.id}/promos`}>
+          <Button variant="outline" size="sm">
+            <Tag className="mr-2 h-3 w-3" />
+            Promos
+          </Button>
+        </Link>
+        <Link href={`/dashboard/events/${event.id}/guests`}>
+          <Button variant="outline" size="sm">
+            <ClipboardList className="mr-2 h-3 w-3" />
+            Guest List
+          </Button>
+        </Link>
         {publicUrl && (
           <Link href={publicUrl} target="_blank">
             <Button variant="outline" size="sm">

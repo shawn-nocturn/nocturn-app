@@ -13,6 +13,9 @@ import {
   CheckCircle,
   Plus,
   Trash2,
+  Mail,
+  Copy,
+  Check,
 } from "lucide-react";
 import Link from "next/link";
 import {
@@ -23,6 +26,7 @@ import {
   getEventExpenses,
 } from "@/app/actions/settlements";
 import { executePayouts } from "@/app/actions/payouts";
+import { generateSettlementReport } from "@/app/actions/settlement-email";
 
 export default function SettlementDetailPage() {
   const params = useParams();
@@ -44,6 +48,7 @@ export default function SettlementDetailPage() {
   const [expenseAmount, setExpenseAmount] = useState("");
   const [addingExpense, setAddingExpense] = useState(false);
   const [payingOut, setPayingOut] = useState(false);
+  const [reportCopied, setReportCopied] = useState(false);
 
   useEffect(() => {
     loadData();
@@ -351,6 +356,28 @@ export default function SettlementDetailPage() {
             <div className="rounded-lg bg-green-500/10 p-4 text-center text-green-500 font-medium">
               ✓ Payout complete — funds transferred to connected account
             </div>
+          )}
+
+          {/* Settlement Report */}
+          {settlement && (settlement.status === "approved" || settlement.status === "paid") && (
+            <Button
+              variant="outline"
+              className="w-full"
+              onClick={async () => {
+                const result = await generateSettlementReport(settlement.id as string);
+                if (result.report) {
+                  await navigator.clipboard.writeText(`Subject: ${result.report.subject}\n\n${result.report.body}`);
+                  setReportCopied(true);
+                  setTimeout(() => setReportCopied(false), 3000);
+                }
+              }}
+            >
+              {reportCopied ? (
+                <><Check className="mr-2 h-4 w-4" /> Report Copied to Clipboard</>
+              ) : (
+                <><Mail className="mr-2 h-4 w-4" /> Copy Settlement Report</>
+              )}
+            </Button>
           )}
         </>
       )}
