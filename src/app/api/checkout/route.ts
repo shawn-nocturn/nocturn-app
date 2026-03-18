@@ -117,8 +117,21 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    // Calculate fees
-    const unitAmountCents = Math.round(tier.price * 100);
+    // Validate price
+    const unitAmountCents = Math.round(Number(tier.price) * 100);
+    if (unitAmountCents < 0) {
+      return NextResponse.json({ error: "Invalid ticket price" }, { status: 400 });
+    }
+
+    // Free tickets — bypass Stripe
+    if (unitAmountCents === 0) {
+      // TODO: Create tickets directly for free events
+      return NextResponse.json(
+        { error: "Free ticket registration coming soon" },
+        { status: 400 }
+      );
+    }
+
     const totalCents = unitAmountCents * quantity;
     const applicationFee = Math.round(totalCents * (PLATFORM_FEE_PERCENT / 100));
 

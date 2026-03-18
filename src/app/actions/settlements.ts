@@ -157,7 +157,12 @@ export async function generateSettlement(eventId: string) {
   }
 
   if (lines.length > 0) {
-    await admin.from("settlement_lines").insert(lines);
+    const { error: linesError } = await admin.from("settlement_lines").insert(lines);
+    if (linesError) {
+      console.error("Failed to create settlement lines:", linesError);
+      // Settlement exists but lines failed — return warning
+      return { error: null, settlementId: settlement.id, warning: "Settlement created but some line items may be missing" };
+    }
   }
 
   return { error: null, settlementId: settlement.id };
@@ -170,6 +175,24 @@ export async function approveSettlement(settlementId: string) {
   if (!user) return { error: "Not authenticated" };
 
   const admin = createAdminClient();
+
+  // Verify user owns this settlement's collective
+  const { data: settlement } = await admin
+    .from("settlements")
+    .select("collective_id")
+    .eq("id", settlementId)
+    .single();
+
+  if (!settlement) return { error: "Settlement not found" };
+
+  const { count } = await admin
+    .from("collective_members")
+    .select("*", { count: "exact", head: true })
+    .eq("collective_id", settlement.collective_id)
+    .eq("user_id", user.id)
+    .is("deleted_at", null);
+
+  if (!count || count === 0) return { error: "You don't have permission to approve this settlement" };
 
   const { error } = await admin
     .from("settlements")

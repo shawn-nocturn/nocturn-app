@@ -133,6 +133,7 @@ export async function createEvent(input: CreateEventInput) {
 
     if (tierError) {
       console.error("Ticket tier error:", tierError);
+      return { error: `Event created but ticket tiers failed: ${tierError.message}`, eventId: event.id };
     }
   }
 

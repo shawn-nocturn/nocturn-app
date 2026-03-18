@@ -85,6 +85,18 @@ async function handleCheckoutCompleted(session: Stripe.Checkout.Session) {
 
   const supabase = createAdminClient();
 
+  // IDEMPOTENCY CHECK: Prevent duplicate ticket creation on webhook retry
+  const { count: existingCount } = await supabase
+    .from("tickets")
+    .select("*", { count: "exact", head: true })
+    .eq("event_id", eventId)
+    .eq("stripe_payment_intent_id", paymentIntentId);
+
+  if (existingCount && existingCount > 0) {
+    console.log(`[stripe-webhook] Tickets already exist for session ${session.id}, skipping`);
+    return;
+  }
+
   // Look up the tier to get the price
   const { data: tier, error: tierError } = await supabase
     .from("ticket_tiers")
