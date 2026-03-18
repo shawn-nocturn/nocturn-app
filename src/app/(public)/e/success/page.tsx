@@ -1,12 +1,31 @@
 "use client";
 
 import { useSearchParams } from "next/navigation";
-import { Suspense } from "react";
+import { Suspense, useEffect, useState } from "react";
 import Link from "next/link";
+import { getTicketsBySessionId } from "@/app/actions/tickets";
+
+interface TicketStub {
+  ticket_token: string;
+  status: string;
+  created_at: string;
+}
 
 function SuccessContent() {
   const searchParams = useSearchParams();
   const sessionId = searchParams.get("session_id");
+  const [tickets, setTickets] = useState<TicketStub[]>([]);
+  const [loading, setLoading] = useState(false);
+
+  useEffect(() => {
+    if (!sessionId) return;
+    setLoading(true);
+    getTicketsBySessionId(sessionId)
+      .then(({ tickets: found }) => {
+        if (found) setTickets(found);
+      })
+      .finally(() => setLoading(false));
+  }, [sessionId]);
 
   return (
     <div className="min-h-screen flex items-center justify-center bg-background px-4">
@@ -38,6 +57,50 @@ function SuccessContent() {
             </p>
           )}
         </div>
+
+        {/* Ticket Links */}
+        {loading ? (
+          <div className="rounded-xl border border-border bg-card p-4">
+            <p className="text-sm text-muted-foreground animate-pulse">
+              Loading your tickets...
+            </p>
+          </div>
+        ) : tickets.length > 0 ? (
+          <div className="rounded-xl border border-border bg-card p-4 space-y-3">
+            <p className="text-sm font-medium text-foreground">
+              Your Tickets ({tickets.length})
+            </p>
+            <div className="space-y-2">
+              {tickets.map((t, i) => (
+                <Link
+                  key={t.ticket_token}
+                  href={`/ticket/${t.ticket_token}`}
+                  className="flex items-center justify-between rounded-lg border border-border px-4 py-3 hover:bg-muted/50 transition-colors group"
+                >
+                  <span className="text-sm text-foreground">
+                    Ticket {i + 1}
+                  </span>
+                  <span className="text-xs text-nocturn group-hover:text-nocturn-light transition-colors flex items-center gap-1">
+                    View
+                    <svg
+                      className="w-3 h-3"
+                      fill="none"
+                      viewBox="0 0 24 24"
+                      strokeWidth={2}
+                      stroke="currentColor"
+                    >
+                      <path
+                        strokeLinecap="round"
+                        strokeLinejoin="round"
+                        d="m8.25 4.5 7.5 7.5-7.5 7.5"
+                      />
+                    </svg>
+                  </span>
+                </Link>
+              ))}
+            </div>
+          </div>
+        ) : null}
 
         <div className="pt-4 space-y-3">
           <Link

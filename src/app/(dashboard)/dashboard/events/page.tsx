@@ -130,46 +130,44 @@ function EventCard({
   };
 
   return (
-    <Card className="transition-colors hover:border-nocturn/30">
-      <CardContent className="flex items-center gap-4 p-4">
-        <div className="flex h-12 w-12 flex-col items-center justify-center rounded-lg bg-nocturn/10 text-nocturn">
-          <span className="text-xs font-medium uppercase">
-            {date.toLocaleDateString("en", { month: "short" })}
-          </span>
-          <span className="text-lg font-bold leading-none">
-            {date.getDate()}
-          </span>
-        </div>
-        <div className="flex-1 min-w-0">
-          <p className="font-medium truncate">{event.title}</p>
-          <div className="flex items-center gap-3 text-xs text-muted-foreground">
-            {event.venues && (
-              <span className="flex items-center gap-1">
-                <MapPin className="h-3 w-3" />
-                {event.venues.name}
-              </span>
-            )}
-            <span className="flex items-center gap-1">
-              <Clock className="h-3 w-3" />
-              {date.toLocaleTimeString("en", { hour: "numeric", minute: "2-digit" })}
+    <Link href={`/dashboard/events/${event.id}`}>
+      <Card className="transition-colors hover:border-nocturn/30 cursor-pointer">
+        <CardContent className="flex items-center gap-4 p-4">
+          <div className="flex h-12 w-12 flex-col items-center justify-center rounded-lg bg-nocturn/10 text-nocturn">
+            <span className="text-xs font-medium uppercase">
+              {date.toLocaleDateString("en", { month: "short" })}
+            </span>
+            <span className="text-lg font-bold leading-none">
+              {date.getDate()}
             </span>
           </div>
-        </div>
-        <Link
-          href={`/dashboard/events/${event.id}/lineup`}
-          className="flex items-center gap-1 rounded-md px-2 py-1 text-xs text-muted-foreground hover:bg-nocturn/10 hover:text-nocturn transition-colors"
-        >
-          <Music className="h-3 w-3" />
-          Lineup
-        </Link>
-        <span
-          className={`rounded-full px-2 py-0.5 text-xs font-medium capitalize ${
-            statusColors[event.status] ?? ""
-          }`}
-        >
-          {event.status}
-        </span>
-      </CardContent>
-    </Card>
+          <div className="flex-1 min-w-0">
+            <p className="font-medium truncate">{event.title}</p>
+            <div className="flex items-center gap-3 text-xs text-muted-foreground">
+              {event.venues && (
+                <span className="flex items-center gap-1">
+                  <MapPin className="h-3 w-3" />
+                  {event.venues.name}
+                </span>
+              )}
+              <span className="flex items-center gap-1">
+                <Clock className="h-3 w-3" />
+                {date.toLocaleTimeString("en", { hour: "numeric", minute: "2-digit" })}
+              </span>
+            </div>
+          </div>
+          <span className="flex items-center gap-1 text-xs text-muted-foreground">
+            <Music className="h-3 w-3" />
+          </span>
+          <span
+            className={`rounded-full px-2 py-0.5 text-xs font-medium capitalize ${
+              statusColors[event.status] ?? ""
+            }`}
+          >
+            {event.status}
+          </span>
+        </CardContent>
+      </Card>
+    </Link>
   );
 }

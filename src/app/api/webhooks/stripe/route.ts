@@ -3,6 +3,7 @@ import { createClient } from "@supabase/supabase-js";
 import { getStripe } from "@/lib/stripe";
 import Stripe from "stripe";
 import { randomUUID } from "crypto";
+import QRCode from "qrcode";
 
 function createAdminClient() {
   return createClient(
@@ -112,9 +113,10 @@ async function handleCheckoutCompleted(session: Stripe.Checkout.Session) {
     },
   }));
 
-  const { error: insertError } = await supabase
+  const { data: insertedTickets, error: insertError } = await supabase
     .from("tickets")
-    .insert(tickets);
+    .insert(tickets)
+    .select("id, ticket_token");
 
   if (insertError) {
     console.error("[stripe-webhook] Failed to insert tickets:", insertError);
@@ -124,4 +126,37 @@ async function handleCheckoutCompleted(session: Stripe.Checkout.Session) {
   console.log(
     `[stripe-webhook] Created ${quantity} ticket(s) for event ${eventId}, session ${session.id}`
   );
+
+  // Generate QR codes for each ticket
+  if (insertedTickets && insertedTickets.length > 0) {
+    const BASE_URL = "https://nocturn-app-navy.vercel.app";
+
+    await Promise.allSettled(
+      insertedTickets.map(async (ticket) => {
+        try {
+          const checkInUrl = `${BASE_URL}/check-in/${ticket.ticket_token}`;
+          const qrDataUrl = await QRCode.toDataURL(checkInUrl, {
+            width: 400,
+            margin: 2,
+            color: { dark: "#000000", light: "#ffffff" },
+            errorCorrectionLevel: "H",
+          });
+
+          await supabase
+            .from("tickets")
+            .update({ qr_code: qrDataUrl })
+            .eq("id", ticket.id);
+        } catch (qrErr) {
+          console.error(
+            `[stripe-webhook] QR generation failed for ticket ${ticket.id}:`,
+            qrErr
+          );
+        }
+      })
+    );
+
+    console.log(
+      `[stripe-webhook] Generated QR codes for ${insertedTickets.length} ticket(s)`
+    );
+  }
 }

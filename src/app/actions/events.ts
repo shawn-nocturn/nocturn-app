@@ -138,3 +138,116 @@ export async function createEvent(input: CreateEventInput) {
 
   return { error: null, eventId: event.id };
 }
+
+async function verifyEventOwnership(userId: string, eventId: string) {
+  const admin = createAdminClient();
+
+  // Get user's collectives
+  const { data: memberships } = await admin
+    .from("collective_members")
+    .select("collective_id")
+    .eq("user_id", userId);
+
+  if (!memberships || memberships.length === 0) {
+    return { error: "No collective found.", event: null };
+  }
+
+  const collectiveIds = memberships.map((m) => m.collective_id);
+
+  // Fetch event and verify it belongs to one of user's collectives
+  const { data: event } = await admin
+    .from("events")
+    .select("id, status, collective_id")
+    .eq("id", eventId)
+    .single();
+
+  if (!event) {
+    return { error: "Event not found.", event: null };
+  }
+
+  if (!collectiveIds.includes(event.collective_id)) {
+    return { error: "You don't have permission to manage this event.", event: null };
+  }
+
+  return { error: null, event };
+}
+
+export async function publishEvent(eventId: string) {
+  const supabase = await createServerClient();
+  const {
+    data: { user },
+  } = await supabase.auth.getUser();
+
+  if (!user) return { error: "You must be logged in." };
+
+  const ownership = await verifyEventOwnership(user.id, eventId);
+  if (ownership.error) return { error: ownership.error };
+
+  if (ownership.event!.status !== "draft") {
+    return { error: `Cannot publish an event with status "${ownership.event!.status}". Only draft events can be published.` };
+  }
+
+  const admin = createAdminClient();
+  const { error } = await admin
+    .from("events")
+    .update({ status: "published" })
+    .eq("id", eventId);
+
+  if (error) return { error: `Failed to publish: ${error.message}` };
+  return { error: null };
+}
+
+export async function cancelEvent(eventId: string) {
+  const supabase = await createServerClient();
+  const {
+    data: { user },
+  } = await supabase.auth.getUser();
+
+  if (!user) return { error: "You must be logged in." };
+
+  const ownership = await verifyEventOwnership(user.id, eventId);
+  if (ownership.error) return { error: ownership.error };
+
+  const status = ownership.event!.status;
+  if (status === "cancelled") {
+    return { error: "Event is already cancelled." };
+  }
+  if (status === "completed") {
+    return { error: "Cannot cancel a completed event." };
+  }
+
+  const admin = createAdminClient();
+  const { error } = await admin
+    .from("events")
+    .update({ status: "cancelled" })
+    .eq("id", eventId);
+
+  if (error) return { error: `Failed to cancel: ${error.message}` };
+  return { error: null };
+}
+
+export async function completeEvent(eventId: string) {
+  const supabase = await createServerClient();
+  const {
+    data: { user },
+  } = await supabase.auth.getUser();
+
+  if (!user) return { error: "You must be logged in." };
+
+  const ownership = await verifyEventOwnership(user.id, eventId);
+  if (ownership.error) return { error: ownership.error };
+
+  const status = ownership.event!.status;
+  if (status !== "published" && status !== "upcoming") {
+    return { error: `Cannot complete an event with status "${status}". Only published or upcoming events can be completed.` };
+  }
+
+  const admin = createAdminClient();
+  const { error } = await admin
+    .from("events")
+    .update({ status: "completed" })
+    .eq("id", eventId);
+
+  if (error) return { error: `Failed to complete: ${error.message}` };
+  return { error: null };
+}
