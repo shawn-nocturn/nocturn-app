@@ -217,9 +217,9 @@ export default function SettlementDetailPage() {
                 >
                   <div>
                     <span className="rounded bg-muted px-1.5 py-0.5 text-xs capitalize">
-                      {exp.category as string}
+                      {String(exp.category)}
                     </span>
-                    <span className="ml-2">{exp.description as string}</span>
+                    <span className="ml-2">{String(exp.description)}</span>
                   </div>
                   <span className="font-medium">${Number(exp.amount).toFixed(2)}</span>
                 </div>
@@ -273,7 +273,7 @@ export default function SettlementDetailPage() {
                       : ""
                   }`}
                 >
-                  {settlement.status as string}
+                  {String(settlement.status)}
                 </span>
               </div>
             </CardHeader>
@@ -295,7 +295,7 @@ export default function SettlementDetailPage() {
                 </p>
                 {lines.map((line) => (
                   <div key={line.id as string} className="flex justify-between text-sm">
-                    <span className="text-muted-foreground">{line.label as string}</span>
+                    <span className="text-muted-foreground">{String(line.label)}</span>
                     <span className="text-red-400">
                       -${Number(line.amount).toFixed(2)}
                     </span>

@@ -247,8 +247,8 @@ export default function EventTasksPage() {
                     className="w-full flex items-center justify-between rounded-lg border p-3 text-left hover:border-nocturn/30 transition-colors"
                   >
                     <div>
-                      <p className="font-medium text-sm">{pb.name as string}</p>
-                      <p className="text-xs text-muted-foreground">{pb.description as string}</p>
+                      <p className="font-medium text-sm">{String(pb.name)}</p>
+                      <p className="text-xs text-muted-foreground">{String(pb.description)}</p>
                     </div>
                     {applyingPlaybook ? (
                       <Loader2 className="h-4 w-4 animate-spin text-nocturn" />
@@ -410,7 +410,7 @@ export default function EventTasksPage() {
                           })}
                         </span>
                       </div>
-                      <p className="text-sm text-muted-foreground">{item.content as string}</p>
+                      <p className="text-sm text-muted-foreground">{String(item.content)}</p>
                     </div>
                   </div>
                 );
@@ -463,11 +463,11 @@ function TaskGroup({
                 </button>
                 <div className="flex-1 min-w-0">
                   <p className={`text-sm font-medium ${task.status === "done" ? "line-through" : ""} ${priorityColors[task.priority as string] ?? ""}`}>
-                    {task.title as string}
+                    {String(task.title)}
                   </p>
                   <div className="flex items-center gap-2 mt-0.5">
                     <span className={`rounded-full px-1.5 py-0.5 text-[10px] font-medium ${categoryColors[task.category as string] ?? categoryColors.general}`}>
-                      {task.category as string}
+                      {String(task.category)}
                     </span>
                     {typeof task.due_date === "string" && task.due_date && (
                       <span className="text-[10px] text-muted-foreground">
