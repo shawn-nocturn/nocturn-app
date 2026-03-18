@@ -66,16 +66,16 @@ export default function SettingsPage() {
           id: string;
           name: string;
           slug: string;
-          bio: string | null;
-          city: string;
+          description: string | null;
           instagram: string | null;
           website: string | null;
+          metadata: { city?: string } | null;
         };
         setCollectiveId(c.id);
         setName(c.name);
         setSlug(c.slug);
-        setBio(c.bio ?? "");
-        setCity(c.city);
+        setBio(c.description ?? "");
+        setCity(c.metadata?.city ?? "");
         setInstagram(c.instagram ?? "");
         setWebsite(c.website ?? "");
       }
@@ -122,10 +122,10 @@ export default function SettingsPage() {
       .update({
         name,
         slug,
-        bio: bio || null,
-        city,
+        description: bio || null,
         instagram: instagram || null,
         website: website || null,
+        metadata: { city },
       })
       .eq("id", collectiveId);
 

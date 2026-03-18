@@ -2,7 +2,7 @@
 
 import { useState } from "react";
 import { useRouter } from "next/navigation";
-import { createClient } from "@/lib/supabase/client";
+import { createCollective } from "@/app/actions/auth";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -23,7 +23,6 @@ function slugify(text: string): string {
 
 export default function OnboardingPage() {
   const router = useRouter();
-  const supabase = createClient();
   const [name, setName] = useState("");
   const [slug, setSlug] = useState("");
   const [bio, setBio] = useState("");
@@ -43,40 +42,17 @@ export default function OnboardingPage() {
     setError(null);
     setLoading(true);
 
-    const {
-      data: { user },
-    } = await supabase.auth.getUser();
+    const result = await createCollective({
+      name,
+      slug,
+      description: bio || null,
+      city,
+      instagram: instagram || null,
+      website: website || null,
+    });
 
-    if (!user) {
-      setError("You must be logged in.");
-      setLoading(false);
-      return;
-    }
-
-    // Create the collective
-    const { data: collective, error: collectiveError } = await supabase
-      .from("collectives")
-      .insert({ name, slug, bio: bio || null, city, instagram: instagram || null, website: website || null })
-      .select()
-      .single();
-
-    if (collectiveError) {
-      setError(collectiveError.message);
-      setLoading(false);
-      return;
-    }
-
-    // Add current user as admin
-    const { error: memberError } = await supabase
-      .from("collective_members")
-      .insert({
-        collective_id: collective.id,
-        user_id: user.id,
-        role: "admin",
-      });
-
-    if (memberError) {
-      setError(memberError.message);
+    if (result.error) {
+      setError(result.error);
       setLoading(false);
       return;
     }

@@ -1,6 +1,16 @@
 import { redirect } from "next/navigation";
 import { createClient } from "@/lib/supabase/server";
+import { createClient as createSupabaseClient } from "@supabase/supabase-js";
 import { DashboardShell } from "@/components/dashboard-shell";
+
+// Admin client for bypassing RLS on membership check
+function createAdminClient() {
+  return createSupabaseClient(
+    process.env.NEXT_PUBLIC_SUPABASE_URL!,
+    process.env.SUPABASE_SERVICE_ROLE_KEY!,
+    { auth: { autoRefreshToken: false, persistSession: false } }
+  );
+}
 
 export default async function DashboardLayout({
   children,
@@ -16,28 +26,32 @@ export default async function DashboardLayout({
     redirect("/login");
   }
 
-  // Check if user has any collectives — if not, redirect to onboarding
-  const { count } = await supabase
+  // Use admin client to check memberships (bypasses RLS chicken-and-egg issue)
+  const admin = createAdminClient();
+
+  const { count } = await admin
     .from("collective_members")
     .select("*", { count: "exact", head: true })
-    .eq("user_id", user.id);
+    .eq("user_id", user.id)
+    .is("deleted_at", null);
 
   if (!count || count === 0) {
     redirect("/onboarding");
   }
 
-  // Fetch user profile
-  const { data: profile } = await supabase
+  // Fetch user profile (admin to bypass RLS)
+  const { data: profile } = await admin
     .from("users")
     .select("*")
     .eq("id", user.id)
     .single();
 
-  // Fetch user's collectives
-  const { data: memberships } = await supabase
+  // Fetch user's collectives (admin to bypass RLS)
+  const { data: memberships } = await admin
     .from("collective_members")
     .select("collective_id, role, collectives(id, name, slug, logo_url)")
-    .eq("user_id", user.id);
+    .eq("user_id", user.id)
+    .is("deleted_at", null);
 
   const collectives =
     memberships?.map((m) => {
