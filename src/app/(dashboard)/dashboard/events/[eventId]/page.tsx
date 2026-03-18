@@ -14,6 +14,7 @@ import {
   DollarSign,
   Users,
   Ticket,
+  ScanLine,
 } from "lucide-react";
 import Link from "next/link";
 import { EventStatusActions } from "./event-status-actions";
@@ -164,6 +165,14 @@ export default async function EventDetailPage({ params }: Props) {
             Manage Lineup
           </Button>
         </Link>
+        {(event.status === "published" || event.status === "upcoming") && (
+          <Link href={`/dashboard/events/${event.id}/check-in`}>
+            <Button variant="outline" size="sm">
+              <ScanLine className="mr-2 h-3 w-3" />
+              Check-in Scanner
+            </Button>
+          </Link>
+        )}
         {publicUrl && (
           <Link href={publicUrl} target="_blank">
             <Button variant="outline" size="sm">

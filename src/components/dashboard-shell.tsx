@@ -16,6 +16,7 @@ import {
   Sparkles,
   DollarSign,
   Users,
+  UserCheck,
   Music,
   Settings,
   LogOut,
@@ -30,8 +31,9 @@ interface DashboardShellProps {
 const navItems = [
   { href: "/dashboard", label: "Home", icon: Home },
   { href: "/dashboard/events", label: "Events", icon: Calendar },
-  { href: "/dashboard/marketing", label: "Marketing", icon: Sparkles },
   { href: "/dashboard/artists", label: "Artists", icon: Music },
+  { href: "/dashboard/attendees", label: "Attendees", icon: UserCheck },
+  { href: "/dashboard/marketing", label: "Marketing", icon: Sparkles },
   { href: "/dashboard/finance", label: "Finance", icon: DollarSign },
   { href: "/dashboard/members", label: "Members", icon: Users },
   { href: "/dashboard/settings", label: "Settings", icon: Settings },

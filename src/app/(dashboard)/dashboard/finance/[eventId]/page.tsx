@@ -22,6 +22,7 @@ import {
   addEventExpense,
   getEventExpenses,
 } from "@/app/actions/settlements";
+import { executePayouts } from "@/app/actions/payouts";
 
 export default function SettlementDetailPage() {
   const params = useParams();
@@ -42,6 +43,7 @@ export default function SettlementDetailPage() {
   const [expenseDescription, setExpenseDescription] = useState("");
   const [expenseAmount, setExpenseAmount] = useState("");
   const [addingExpense, setAddingExpense] = useState(false);
+  const [payingOut, setPayingOut] = useState(false);
 
   useEffect(() => {
     loadData();
@@ -324,6 +326,30 @@ export default function SettlementDetailPage() {
               >
                 {generating ? "Regenerating..." : "Regenerate"}
               </Button>
+            </div>
+          )}
+
+          {settlement.status === "approved" && (
+            <Button
+              className="w-full bg-green-600 hover:bg-green-700"
+              onClick={async () => {
+                setPayingOut(true);
+                setError(null);
+                const result = await executePayouts(settlement.id as string);
+                if (result.error) setError(result.error);
+                await loadData();
+                setPayingOut(false);
+              }}
+              disabled={payingOut}
+            >
+              <DollarSign className="mr-2 h-4 w-4" />
+              {payingOut ? "Processing Payout..." : "Execute Payout via Stripe"}
+            </Button>
+          )}
+
+          {settlement.status === "paid" && (
+            <div className="rounded-lg bg-green-500/10 p-4 text-center text-green-500 font-medium">
+              ✓ Payout complete — funds transferred to connected account
             </div>
           )}
         </>

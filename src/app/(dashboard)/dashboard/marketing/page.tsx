@@ -52,12 +52,14 @@ export default function MarketingPage() {
           description="Threads, announcements, hype posts"
           count={0}
         />
-        <ChannelCard
-          icon={<Mail className="h-5 w-5" />}
-          title="Email"
-          description="Event announcements, recaps, promos"
-          count={0}
-        />
+        <Link href="/dashboard/marketing/email">
+          <ChannelCard
+            icon={<Mail className="h-5 w-5" />}
+            title="Email"
+            description="Event announcements, recaps, promos"
+            count={0}
+          />
+        </Link>
         <ChannelCard
           icon={<Sparkles className="h-5 w-5" />}
           title="Press / Bio"
