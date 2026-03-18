@@ -1,138 +1,144 @@
-import { createClient } from "@/lib/supabase/server";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { Calendar, Sparkles, DollarSign, ArrowRight } from "lucide-react";
-import Link from "next/link";
+import { createClient } from "@supabase/supabase-js";
+import { createClient as createServerClient } from "@/lib/supabase/server";
+import { DashboardHome } from "@/components/dashboard-home";
+
+function createAdminClient() {
+  return createClient(
+    process.env.NEXT_PUBLIC_SUPABASE_URL!,
+    process.env.SUPABASE_SERVICE_ROLE_KEY!,
+    { auth: { autoRefreshToken: false, persistSession: false } }
+  );
+}
 
 export default async function DashboardPage() {
-  const supabase = await createClient();
-  const {
-    data: { user },
-  } = await supabase.auth.getUser();
+  const supabase = await createServerClient();
+  const { data: { user } } = await supabase.auth.getUser();
+  const admin = createAdminClient();
 
-  const { data: profile } = await supabase
+  // Get user profile
+  const { data: profile } = await admin
     .from("users")
     .select("full_name")
     .eq("id", user!.id)
     .single();
 
+  const firstName = (profile?.full_name ?? user!.email ?? "").split(" ")[0] || "there";
+
   // Get user's collectives
-  const { data: memberships } = await supabase
+  const { data: memberships } = await admin
     .from("collective_members")
-    .select("collective_id")
-    .eq("user_id", user!.id);
+    .select("collective_id, collectives(name, metadata, created_at)")
+    .eq("user_id", user!.id)
+    .is("deleted_at", null)
+    .limit(1);
+
+  const membership = memberships?.[0];
+  const collective = membership?.collectives as unknown as {
+    name: string;
+    metadata: Record<string, unknown> | null;
+    created_at: string;
+  } | null;
+
+  const collectiveName = collective?.name ?? "your collective";
+  const collectiveAge = collective?.created_at
+    ? Math.floor((Date.now() - new Date(collective.created_at).getTime()) / 86400000)
+    : 999;
 
   const collectiveIds = memberships?.map((m) => m.collective_id) ?? [];
 
-  // Fetch upcoming events
-  let eventCount = 0;
+  // Get upcoming events count + next event + draft check
+  let upcomingCount = 0;
+  let nextEvent: { title: string; daysUntil: number } | null = null;
+  let hasDraftEvent = false;
+  let draftEventTitle: string | undefined;
+
   if (collectiveIds.length > 0) {
-    const { count } = await supabase
+    const now = new Date().toISOString();
+
+    const { count } = await admin
       .from("events")
       .select("*", { count: "exact", head: true })
       .in("collective_id", collectiveIds)
-      .gte("date", new Date().toISOString());
-    eventCount = count ?? 0;
+      .in("status", ["published", "upcoming"])
+      .gte("starts_at", now);
+
+    upcomingCount = count ?? 0;
+
+    // Next upcoming event
+    const { data: nextEvents } = await admin
+      .from("events")
+      .select("title, starts_at")
+      .in("collective_id", collectiveIds)
+      .in("status", ["published", "upcoming"])
+      .gte("starts_at", now)
+      .order("starts_at", { ascending: true })
+      .limit(1);
+
+    if (nextEvents?.[0]) {
+      const daysUntil = Math.ceil(
+        (new Date(nextEvents[0].starts_at).getTime() - Date.now()) / 86400000
+      );
+      nextEvent = { title: nextEvents[0].title, daysUntil };
+    }
+
+    // Check for drafts
+    const { data: drafts } = await admin
+      .from("events")
+      .select("title")
+      .in("collective_id", collectiveIds)
+      .eq("status", "draft")
+      .limit(1);
+
+    if (drafts?.[0]) {
+      hasDraftEvent = true;
+      draftEventTitle = drafts[0].title;
+    }
   }
 
-  const firstName = profile?.full_name?.split(" ")[0] ?? "there";
-  const hour = new Date().getHours();
-  const greeting =
-    hour < 12 ? "Good morning" : hour < 18 ? "Good afternoon" : "Good evening";
+  // Revenue from settlements
+  let totalRevenue = 0;
+  if (collectiveIds.length > 0) {
+    const { data: settlements } = await admin
+      .from("settlements")
+      .select("gross_revenue")
+      .in("collective_id", collectiveIds);
+
+    totalRevenue = (settlements ?? []).reduce(
+      (sum, s) => sum + (Number(s.gross_revenue) || 0), 0
+    );
+  }
+
+  // Attendee count
+  let totalAttendees = 0;
+  if (collectiveIds.length > 0) {
+    const { data: events } = await admin
+      .from("events")
+      .select("id")
+      .in("collective_id", collectiveIds);
+
+    const eventIds = events?.map((e) => e.id) ?? [];
+    if (eventIds.length > 0) {
+      const { count } = await admin
+        .from("tickets")
+        .select("*", { count: "exact", head: true })
+        .in("event_id", eventIds)
+        .in("status", ["paid", "checked_in"]);
+
+      totalAttendees = count ?? 0;
+    }
+  }
 
   return (
-    <div className="space-y-6">
-      {/* Greeting */}
-      <div>
-        <h1 className="text-2xl font-bold">
-          {greeting}, {firstName}
-        </h1>
-        <p className="text-sm text-muted-foreground">
-          Here&apos;s what&apos;s happening with your collective.
-        </p>
-      </div>
-
-      {/* Quick stats — matches prototype */}
-      <div className="grid grid-cols-3 gap-3">
-        <Card className="bg-card">
-          <CardContent className="p-4 text-center">
-            <p className="text-2xl font-bold text-nocturn">{eventCount}</p>
-            <p className="text-xs text-muted-foreground">Upcoming</p>
-          </CardContent>
-        </Card>
-        <Card className="bg-card">
-          <CardContent className="p-4 text-center">
-            <p className="text-2xl font-bold">$0</p>
-            <p className="text-xs text-muted-foreground">This Month</p>
-          </CardContent>
-        </Card>
-        <Card className="bg-card">
-          <CardContent className="p-4 text-center">
-            <p className="text-2xl font-bold">0</p>
-            <p className="text-xs text-muted-foreground">Posts</p>
-          </CardContent>
-        </Card>
-      </div>
-
-      {/* Featured event card — empty state */}
-      <Card className="overflow-hidden">
-        <div className="relative h-32 bg-gradient-to-br from-nocturn/20 to-nocturn-glow/10">
-          <div className="absolute inset-0 flex items-center justify-center">
-            <p className="text-sm text-muted-foreground">No upcoming events yet</p>
-          </div>
-        </div>
-        <CardContent className="p-4">
-          <Link
-            href="/dashboard/events"
-            className="flex items-center justify-between text-sm font-medium text-nocturn hover:underline"
-          >
-            Create your first event
-            <ArrowRight className="h-4 w-4" />
-          </Link>
-        </CardContent>
-      </Card>
-
-      {/* Quick actions */}
-      <div className="grid grid-cols-2 gap-3">
-        <Link href="/dashboard/marketing">
-          <Card className="transition-colors hover:border-nocturn/30">
-            <CardContent className="flex items-center gap-3 p-4">
-              <div className="flex h-10 w-10 items-center justify-center rounded-lg bg-nocturn/10">
-                <Sparkles className="h-5 w-5 text-nocturn" />
-              </div>
-              <div>
-                <p className="text-sm font-medium">Marketing</p>
-                <p className="text-xs text-muted-foreground">Generate content</p>
-              </div>
-            </CardContent>
-          </Card>
-        </Link>
-        <Link href="/dashboard/finance">
-          <Card className="transition-colors hover:border-nocturn/30">
-            <CardContent className="flex items-center gap-3 p-4">
-              <div className="flex h-10 w-10 items-center justify-center rounded-lg bg-nocturn-teal/10">
-                <DollarSign className="h-5 w-5 text-nocturn-teal" />
-              </div>
-              <div>
-                <p className="text-sm font-medium">Finance</p>
-                <p className="text-xs text-muted-foreground">View settlements</p>
-              </div>
-            </CardContent>
-          </Card>
-        </Link>
-      </div>
-
-      {/* Activity feed — empty state */}
-      <Card>
-        <CardHeader>
-          <CardTitle className="text-base">Recent Activity</CardTitle>
-        </CardHeader>
-        <CardContent className="text-sm text-muted-foreground">
-          <div className="flex flex-col items-center gap-2 py-6">
-            <Calendar className="h-8 w-8 text-muted-foreground/50" />
-            <p>No activity yet. Create an event to get started.</p>
-          </div>
-        </CardContent>
-      </Card>
-    </div>
+    <DashboardHome
+      firstName={firstName}
+      collectiveName={collectiveName}
+      collectiveAge={collectiveAge}
+      upcomingCount={upcomingCount}
+      nextEvent={nextEvent}
+      hasDraftEvent={hasDraftEvent}
+      draftEventTitle={draftEventTitle}
+      totalRevenue={totalRevenue}
+      totalAttendees={totalAttendees}
+    />
   );
 }

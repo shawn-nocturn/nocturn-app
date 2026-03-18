@@ -2,6 +2,7 @@ import { redirect } from "next/navigation";
 import { createClient } from "@/lib/supabase/server";
 import { createClient as createSupabaseClient } from "@supabase/supabase-js";
 import { DashboardShell } from "@/components/dashboard-shell";
+import { AskNocturnButton } from "@/components/ask-nocturn-button";
 
 // Admin client for bypassing RLS on membership check
 function createAdminClient() {
@@ -60,11 +61,14 @@ export default async function DashboardLayout({
     }) ?? [];
 
   return (
-    <DashboardShell
-      user={{ id: user.id, email: user.email ?? "", fullName: profile?.full_name ?? "" }}
-      collectives={collectives}
-    >
-      {children}
-    </DashboardShell>
+    <>
+      <DashboardShell
+        user={{ id: user.id, email: user.email ?? "", fullName: profile?.full_name ?? "" }}
+        collectives={collectives}
+      >
+        {children}
+      </DashboardShell>
+      <AskNocturnButton />
+    </>
   );
 }
