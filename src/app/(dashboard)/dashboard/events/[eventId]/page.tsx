@@ -18,6 +18,8 @@ import {
   ListChecks,
   Tag,
   ClipboardList,
+  BarChart3,
+  FileText,
 } from "lucide-react";
 import Link from "next/link";
 import { EventStatusActions } from "./event-status-actions";
@@ -194,6 +196,20 @@ export default async function EventDetailPage({ params }: Props) {
             Guest List
           </Button>
         </Link>
+        <Link href={`/dashboard/events/${event.id}/forecast`}>
+          <Button variant="outline" size="sm" className="border-nocturn-teal/30 text-nocturn-teal hover:bg-nocturn-teal/10">
+            <BarChart3 className="mr-2 h-3 w-3" />
+            Forecast
+          </Button>
+        </Link>
+        {(event.status === "completed" || event.status === "settled") && (
+          <Link href={`/dashboard/events/${event.id}/recap`}>
+            <Button variant="outline" size="sm" className="border-nocturn-amber/30 text-nocturn-amber hover:bg-nocturn-amber/10">
+              <FileText className="mr-2 h-3 w-3" />
+              Recap
+            </Button>
+          </Link>
+        )}
         {publicUrl && (
           <Link href={publicUrl} target="_blank">
             <Button variant="outline" size="sm">
