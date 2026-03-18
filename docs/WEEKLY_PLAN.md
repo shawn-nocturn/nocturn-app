@@ -38,12 +38,12 @@
 - [ ] Event status management (draft → published → completed)
 - [x] Public event page (shareable URL: /e/[collective-slug]/[event-slug])
 
-### Week 5 (Apr 13-19): Artist Booking
-- [ ] Artist database (create, search, browse)
-- [ ] Event lineup builder (add artists, set times, fees, status)
-- [ ] Booking status workflow (pending → confirmed → declined)
-- [ ] Artist page with upcoming events
-- [ ] Genre tagging and search
+### Week 5 (Apr 13-19): Artist Booking ✅ (done early)
+- [x] Artist database (create, search, browse)
+- [x] Event lineup builder (add artists, set times, fees, status)
+- [x] Booking status workflow (pending → confirmed → declined)
+- [x] Artist detail page with upcoming events + booking history
+- [x] Genre tagging and search
 
 ### Week 6 (Apr 20-26): Stripe Connect + Ticketing
 - [ ] Stripe Connect Express onboarding flow for collectives

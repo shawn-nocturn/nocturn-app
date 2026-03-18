@@ -14,6 +14,7 @@ import {
   CardTitle,
 } from "@/components/ui/card";
 import { Music, Plus, Search, Instagram } from "lucide-react";
+import Link from "next/link";
 
 interface Artist {
   id: string;
@@ -250,7 +251,8 @@ export default function ArtistsPage() {
       ) : (
         <div className="grid gap-3 sm:grid-cols-2">
           {filtered.map((artist) => (
-            <Card key={artist.id} className="transition-colors hover:border-nocturn/30">
+            <Link key={artist.id} href={`/dashboard/artists/${artist.id}`}>
+            <Card className="transition-colors hover:border-nocturn/30">
               <CardContent className="flex items-center gap-4 p-4">
                 <div className="flex h-12 w-12 items-center justify-center rounded-full bg-nocturn/10">
                   <Music className="h-5 w-5 text-nocturn" />
@@ -281,6 +283,7 @@ export default function ArtistsPage() {
                 </div>
               </CardContent>
             </Card>
+            </Link>
           ))}
         </div>
       )}
