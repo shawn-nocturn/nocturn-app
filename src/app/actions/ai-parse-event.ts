@@ -2,8 +2,8 @@
 
 export interface ParsedEventDetails {
   title?: string;
-  date?: string; // YYYY-MM-DD
-  startTime?: string; // HH:MM (24h)
+  date?: string;
+  startTime?: string;
   endTime?: string;
   doorsOpen?: string;
   venueName?: string;
@@ -16,21 +16,16 @@ export interface ParsedEventDetails {
   ticketTierName?: string;
 }
 
-// Parse natural language into structured event data using Claude API
 export async function parseEventDetails(
   message: string,
   existingData: Partial<ParsedEventDetails> = {}
 ): Promise<{ parsed: ParsedEventDetails; reply: string }> {
   const apiKey = process.env.ANTHROPIC_API_KEY;
-
-  // Always try local parsing first (fast, no API needed)
   const localParsed = localParse(message, existingData);
+  const merged = { ...existingData, ...localParsed };
 
   if (!apiKey) {
-    return {
-      parsed: { ...existingData, ...localParsed },
-      reply: generateReply({ ...existingData, ...localParsed }),
-    };
+    return { parsed: merged, reply: generateReply(merged, localParsed) };
   }
 
   try {
@@ -44,113 +39,101 @@ export async function parseEventDetails(
       body: JSON.stringify({
         model: "claude-sonnet-4-20250514",
         max_tokens: 512,
-        messages: [
-          {
-            role: "user",
-            content: `You are an event detail parser for a nightlife platform. Extract structured event information from the user's message.
+        messages: [{
+          role: "user",
+          content: `You parse event details from natural language for a nightlife platform. Extract structured info from the user's message.
 
-Current known details: ${JSON.stringify(existingData)}
+Already known: ${JSON.stringify(existingData)}
+User says: "${message}"
 
-User message: "${message}"
+Return ONLY valid JSON with any of these fields (omit what's not mentioned):
+- title (string), date (YYYY-MM-DD), startTime (HH:MM 24h), endTime (HH:MM 24h), doorsOpen (HH:MM 24h)
+- venueName (string), venueAddress (string), venueCity (string), venueCapacity (number)
+- description (string), ticketPrice (number), ticketQuantity (number), ticketTierName (string)
+- reply (string): casual 1-sentence acknowledgment of what you understood
 
-Return ONLY valid JSON with these fields (omit fields not mentioned):
-- title (string): event name
-- date (string): YYYY-MM-DD format
-- startTime (string): HH:MM in 24h format
-- endTime (string): HH:MM in 24h format
-- doorsOpen (string): HH:MM in 24h format
-- venueName (string): venue name
-- venueAddress (string): street address
-- venueCity (string): city name
-- venueCapacity (number): venue capacity
-- description (string): event description
-- ticketPrice (number): price in dollars
-- ticketQuantity (number): number of tickets
-- ticketTierName (string): tier name like "General Admission"
-- reply (string): A SHORT, casual 1-sentence response acknowledging what you understood. Sound like a cool nightlife AI assistant, not corporate.
-
-Parse relative dates. "Next Saturday" from today (2026-03-18) would be 2026-03-21. "10pm" = "22:00". "Doors at 9" = doorsOpen "21:00".
-If they say a city name, put it in venueCity. If they mention capacity like "300 cap" put it in venueCapacity.`,
-          },
-        ],
+Today is 2026-03-18. "10pm"="22:00". "next saturday"="2026-03-21". Assume PM for nightlife times without am/pm.`,
+        }],
       }),
     });
 
     if (!response.ok) throw new Error(`API ${response.status}`);
-
     const data = await response.json();
     const text = data.content?.[0]?.text ?? "";
     const jsonMatch = text.match(/\{[\s\S]*\}/);
 
     if (jsonMatch) {
       const result = JSON.parse(jsonMatch[0]);
-      const reply = result.reply || generateReply({ ...existingData, ...result });
+      const reply = result.reply || generateReply({ ...existingData, ...result }, result);
       delete result.reply;
-
-      return {
-        parsed: { ...existingData, ...stripEmpty(result) },
-        reply,
-      };
+      return { parsed: { ...existingData, ...stripEmpty(result) }, reply };
     }
   } catch {
-    // Fall through to local parsing
+    // Fall through
   }
 
-  return {
-    parsed: { ...existingData, ...localParsed },
-    reply: generateReply({ ...existingData, ...localParsed }),
-  };
+  return { parsed: merged, reply: generateReply(merged, localParsed) };
 }
 
 function stripEmpty(obj: Record<string, unknown>): Record<string, unknown> {
   const result: Record<string, unknown> = {};
   for (const [key, value] of Object.entries(obj)) {
-    if (value !== null && value !== undefined && value !== "") {
-      result[key] = value;
-    }
+    if (value !== null && value !== undefined && value !== "") result[key] = value;
   }
   return result;
 }
 
-// Fast local parser for common patterns (no API needed)
 function localParse(message: string, existing: Partial<ParsedEventDetails>): Partial<ParsedEventDetails> {
   const result: Partial<ParsedEventDetails> = {};
-  const lower = message.toLowerCase();
+  const lower = message.toLowerCase().trim();
 
-  // Date patterns
-  const dateMatch = message.match(/(\d{4}-\d{2}-\d{2})/);
-  if (dateMatch) result.date = dateMatch[1];
+  // === DATE ===
+  // "2026-04-25"
+  const isoDate = message.match(/(\d{4}-\d{2}-\d{2})/);
+  if (isoDate) result.date = isoDate[1];
 
-  // "April 25" or "Apr 25"
-  const monthDayMatch = lower.match(/(jan|feb|mar|apr|may|jun|jul|aug|sep|oct|nov|dec)\w*\s+(\d{1,2})/);
-  if (monthDayMatch) {
+  // "april 25", "apr 25", "march 30"
+  const monthDay = lower.match(/\b(jan(?:uary)?|feb(?:ruary)?|mar(?:ch)?|apr(?:il)?|may|jun(?:e)?|jul(?:y)?|aug(?:ust)?|sep(?:tember)?|oct(?:ober)?|nov(?:ember)?|dec(?:ember)?)\s+(\d{1,2})\b/);
+  if (monthDay) {
     const months: Record<string, string> = {
       jan: "01", feb: "02", mar: "03", apr: "04", may: "05", jun: "06",
       jul: "07", aug: "08", sep: "09", oct: "10", nov: "11", dec: "12",
     };
-    const month = months[monthDayMatch[1].slice(0, 3)];
-    const day = monthDayMatch[2].padStart(2, "0");
-    result.date = `2026-${month}-${day}`;
+    const m = months[monthDay[1].slice(0, 3)];
+    result.date = `2026-${m}-${monthDay[2].padStart(2, "0")}`;
   }
 
-  // Time patterns: "10pm", "10:30pm", "22:00"
-  const timeMatches = lower.matchAll(/(\d{1,2})(?::(\d{2}))?\s*(am|pm)/g);
+  // === TIME ===
+  // "10pm", "10:30 pm", "10 pm", "starts at 10pm"
+  const timeRegex = /\b(\d{1,2})(?::(\d{2}))?\s*(am|pm)\b/gi;
   const times: string[] = [];
-  for (const match of timeMatches) {
+  let match;
+  while ((match = timeRegex.exec(lower)) !== null) {
     let hour = parseInt(match[1]);
     const min = match[2] || "00";
-    if (match[3] === "pm" && hour < 12) hour += 12;
-    if (match[3] === "am" && hour === 12) hour = 0;
+    if (match[3].toLowerCase() === "pm" && hour < 12) hour += 12;
+    if (match[3].toLowerCase() === "am" && hour === 12) hour = 0;
     times.push(`${hour.toString().padStart(2, "0")}:${min}`);
   }
 
-  // "doors at X" pattern
+  // "starts at 10", "at 10" (assume PM for nightlife)
+  if (times.length === 0) {
+    const impliedTime = lower.match(/(?:starts?\s+(?:at\s+)?|at\s+)(\d{1,2})(?::(\d{2}))?\b(?!\s*(?:am|pm|cap|ticket|dollar))/);
+    if (impliedTime) {
+      let hour = parseInt(impliedTime[1]);
+      const min = impliedTime[2] || "00";
+      if (hour < 12 && hour >= 1) hour += 12; // assume PM
+      times.push(`${hour.toString().padStart(2, "0")}:${min}`);
+    }
+  }
+
+  // "doors at 9"
   const doorsMatch = lower.match(/doors?\s+(?:at\s+)?(\d{1,2})(?::(\d{2}))?\s*(am|pm)?/);
   if (doorsMatch) {
     let hour = parseInt(doorsMatch[1]);
     const min = doorsMatch[2] || "00";
     if (doorsMatch[3] === "pm" && hour < 12) hour += 12;
-    if (!doorsMatch[3] && hour < 12) hour += 12; // assume PM for nightlife
+    if (!doorsMatch[3] && hour < 12 && hour >= 1) hour += 12;
     result.doorsOpen = `${hour.toString().padStart(2, "0")}:${min}`;
   }
 
@@ -158,51 +141,94 @@ function localParse(message: string, existing: Partial<ParsedEventDetails>): Par
   if (times.length >= 2) result.endTime = times[1];
   if (times.length >= 1 && result.doorsOpen) result.startTime = times[0];
 
-  // "at [Venue]" or "@ [Venue]"
-  const venueMatch = message.match(/(?:at|@)\s+([A-Z][A-Za-z\s'&]+?)(?:\s*[,.]|\s+(?:in|on|at|\d))/);
-  if (venueMatch) result.venueName = venueMatch[1].trim();
+  // === VENUE ===
+  // "at The Warehouse", "venue is Biblio", "@ Rebel"
+  const venuePatterns = [
+    /venue\s+(?:is|:)\s+(.+?)(?:\s+(?:and|,|in|on|\.|$))/i,
+    /(?:at|@)\s+([A-Z][A-Za-z\s'&]+?)(?:\s*[,.]|\s+(?:in|on|at|\d)|$)/,
+    /(?:at|@)\s+(.+?)(?:\s+(?:in|on|,|\.|$))/i,
+  ];
+  for (const pattern of venuePatterns) {
+    const venueMatch = message.match(pattern);
+    if (venueMatch) {
+      const name = venueMatch[1].trim().replace(/\s+and\s*$/, "").replace(/\s+city\s+is.*$/i, "");
+      if (name.length > 1 && name.length < 50) {
+        result.venueName = name;
+        break;
+      }
+    }
+  }
 
-  // City: "in Toronto" or "Toronto"
-  const cityMatch = message.match(/\bin\s+([A-Z][a-z]+(?:\s+[A-Z][a-z]+)?)/);
-  if (cityMatch) result.venueCity = cityMatch[1];
+  // === CITY ===
+  // "in Toronto", "city is Toronto", "toronto", "city: toronto"
+  const cityPatterns = [
+    /city\s+(?:is|:)\s+([a-z][a-z\s]+)/i,
+    /\bin\s+([A-Z][a-z]+(?:\s+[A-Z][a-z]+)*)/,
+    /\bin\s+([a-z][a-z\s]+?)(?:\s*[,.]|\s+(?:at|on|and|$))/i,
+  ];
+  for (const pattern of cityPatterns) {
+    const cityMatch = message.match(pattern);
+    if (cityMatch) {
+      const city = cityMatch[1].trim();
+      if (city.length > 1 && city.length < 30) {
+        result.venueCity = city.charAt(0).toUpperCase() + city.slice(1);
+        break;
+      }
+    }
+  }
 
-  // Capacity: "300 cap" or "capacity 300"
-  const capMatch = lower.match(/(\d+)\s*cap(?:acity)?|cap(?:acity)?\s*(\d+)/);
+  // If message is just a city name (single word, no other content parsed)
+  if (!result.venueCity && !result.date && !result.startTime && !result.venueName) {
+    const knownCities = ["toronto", "montreal", "vancouver", "ottawa", "calgary", "edmonton", "winnipeg", "new york", "nyc", "los angeles", "la", "miami", "chicago", "detroit", "brooklyn", "london", "berlin"];
+    if (knownCities.includes(lower.replace(/[.,!?]/g, ""))) {
+      result.venueCity = lower.charAt(0).toUpperCase() + lower.slice(1);
+    }
+  }
+
+  // === CAPACITY ===
+  const capMatch = lower.match(/(\d+)\s*cap(?:acity)?|cap(?:acity)?\s*(?:is\s+)?(\d+)/);
   if (capMatch) result.venueCapacity = parseInt(capMatch[1] || capMatch[2]);
 
-  // Price: "$20" or "20 dollars"
-  const priceMatch = lower.match(/\$(\d+(?:\.\d{2})?)|(\d+)\s*(?:dollars|bucks)/);
-  if (priceMatch) result.ticketPrice = parseFloat(priceMatch[1] || priceMatch[2]);
+  // === PRICE ===
+  const priceMatch = lower.match(/\$(\d+(?:\.\d{2})?)|(\d+)\s*(?:dollars|bucks)|price\s+(?:is\s+)?(\d+)/);
+  if (priceMatch) result.ticketPrice = parseFloat(priceMatch[1] || priceMatch[2] || priceMatch[3]);
 
-  // Quantity: "100 tickets" or "capacity 100"
+  // === QUANTITY ===
   const qtyMatch = lower.match(/(\d+)\s*tickets/);
   if (qtyMatch) result.ticketQuantity = parseInt(qtyMatch[1]);
 
   return result;
 }
 
-function generateReply(data: Partial<ParsedEventDetails>): string {
-  const parts: string[] = [];
+function generateReply(allData: Partial<ParsedEventDetails>, newData: Partial<ParsedEventDetails>): string {
+  // What did we just learn?
+  const justParsed: string[] = [];
+  if (newData.date) justParsed.push("date");
+  if (newData.startTime) justParsed.push("time");
+  if (newData.doorsOpen) justParsed.push("doors time");
+  if (newData.venueName) justParsed.push(`venue (${newData.venueName})`);
+  if (newData.venueCity) justParsed.push(`city (${newData.venueCity})`);
+  if (newData.ticketPrice) justParsed.push("pricing");
+  if (newData.venueCapacity) justParsed.push("capacity");
 
-  if (data.date) parts.push("date");
-  if (data.startTime) parts.push("time");
-  if (data.venueName) parts.push("venue");
-  if (data.venueCity) parts.push("city");
-  if (data.ticketPrice) parts.push("pricing");
-
-  if (parts.length === 0) {
-    return "Got it. What else can you tell me about this event?";
-  }
-
+  // What's still missing?
   const missing: string[] = [];
-  if (!data.date) missing.push("date");
-  if (!data.startTime) missing.push("start time");
-  if (!data.venueName) missing.push("venue");
-  if (!data.venueCity) missing.push("city");
+  if (!allData.title) missing.push("event name");
+  if (!allData.date) missing.push("date");
+  if (!allData.startTime) missing.push("start time");
+  if (!allData.venueName) missing.push("venue name");
+  if (!allData.venueCity) missing.push("city");
+
+  if (justParsed.length === 0) {
+    if (missing.length > 0) {
+      return `I didn't catch that. I still need: ${missing.join(", ")}.`;
+    }
+    return "Looks good! Anything else to add?";
+  }
 
   if (missing.length === 0) {
-    return "Looking good! Ready to set up tickets?";
+    return `Got ${justParsed.join(", ")}. Looking good — ready to launch? 🚀`;
   }
 
-  return `Got the ${parts.join(", ")}. Still need: ${missing.join(", ")}.`;
+  return `Got ${justParsed.join(", ")}! Still need: ${missing.join(", ")}.`;
 }
