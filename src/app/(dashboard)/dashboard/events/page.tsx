@@ -1,4 +1,6 @@
 import { createClient } from "@/lib/supabase/server";
+import { createClient as createSupabaseClient } from "@supabase/supabase-js";
+import { SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY } from "@/lib/supabase/config";
 import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Calendar, Plus, MapPin, Clock, Music } from "lucide-react";
@@ -10,8 +12,12 @@ export default async function EventsPage() {
     data: { user },
   } = await supabase.auth.getUser();
 
+  const admin = createSupabaseClient(SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY, {
+    auth: { autoRefreshToken: false, persistSession: false },
+  });
+
   // Get user's collectives
-  const { data: memberships } = await supabase
+  const { data: memberships } = await admin
     .from("collective_members")
     .select("collective_id")
     .eq("user_id", user!.id);
@@ -30,7 +36,7 @@ export default async function EventsPage() {
   }> = [];
 
   if (collectiveIds.length > 0) {
-    const { data } = await supabase
+    const { data } = await admin
       .from("events")
       .select("id, title, slug, starts_at, status, flyer_url, venues(name, city)")
       .in("collective_id", collectiveIds)

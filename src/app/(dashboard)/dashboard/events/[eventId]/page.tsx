@@ -1,4 +1,6 @@
 import { createClient } from "@/lib/supabase/server";
+import { createClient as createSupabaseClient } from "@supabase/supabase-js";
+import { SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY } from "@/lib/supabase/config";
 import { notFound } from "next/navigation";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -73,8 +75,13 @@ export default async function EventDetailPage({ params }: Props) {
 
   if (!user) notFound();
 
+  // Use admin client to bypass RLS
+  const admin = createSupabaseClient(SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY, {
+    auth: { autoRefreshToken: false, persistSession: false },
+  });
+
   // Verify user owns this event via collective membership
-  const { data: memberships } = await supabase
+  const { data: memberships } = await admin
     .from("collective_members")
     .select("collective_id")
     .eq("user_id", user.id);
@@ -84,7 +91,7 @@ export default async function EventDetailPage({ params }: Props) {
   if (collectiveIds.length === 0) notFound();
 
   // Fetch event with venue
-  const { data: event } = await supabase
+  const { data: event } = await admin
     .from("events")
     .select(
       "id, title, slug, description, starts_at, ends_at, doors_at, status, flyer_url, collective_id, venues(name, address, city, capacity)"
@@ -95,14 +102,14 @@ export default async function EventDetailPage({ params }: Props) {
   if (!event || !collectiveIds.includes(event.collective_id)) notFound();
 
   // Get collective slug for public link
-  const { data: collective } = await supabase
+  const { data: collective } = await admin
     .from("collectives")
     .select("slug, name")
     .eq("id", event.collective_id)
     .single();
 
   // Fetch ticket tiers
-  const { data: tiers } = await supabase
+  const { data: tiers } = await admin
     .from("ticket_tiers")
     .select("id, name, price, capacity, sort_order")
     .eq("event_id", eventId)

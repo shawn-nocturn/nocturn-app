@@ -1,3 +1,5 @@
+import { createClient as createSupabaseClient } from "@supabase/supabase-js";
+import { SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY } from "@/lib/supabase/config";
 import { createClient } from "@/lib/supabase/server";
 import { notFound } from "next/navigation";
 import { EditEventForm } from "./edit-event-form";
@@ -15,8 +17,12 @@ export default async function EditEventPage({ params }: Props) {
 
   if (!user) notFound();
 
+  const admin = createSupabaseClient(SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY, {
+    auth: { autoRefreshToken: false, persistSession: false },
+  });
+
   // Verify user owns this event via collective membership
-  const { data: memberships } = await supabase
+  const { data: memberships } = await admin
     .from("collective_members")
     .select("collective_id")
     .eq("user_id", user.id);
@@ -26,7 +32,7 @@ export default async function EditEventPage({ params }: Props) {
   if (collectiveIds.length === 0) notFound();
 
   // Fetch event with venue
-  const { data: event } = await supabase
+  const { data: event } = await admin
     .from("events")
     .select(
       "id, title, slug, description, starts_at, ends_at, doors_at, status, collective_id, venue_id, venues(id, name, address, city, capacity)"
@@ -49,7 +55,7 @@ export default async function EditEventPage({ params }: Props) {
   }
 
   // Fetch ticket tiers
-  const { data: tiers } = await supabase
+  const { data: tiers } = await admin
     .from("ticket_tiers")
     .select("id, name, price, capacity, sort_order")
     .eq("event_id", eventId)
