@@ -18,41 +18,34 @@ export async function signUpUser(formData: {
   password: string;
   fullName: string;
 }) {
-  const admin = createAdminClient();
-
-  // Create user with auto-confirm via admin API
-  const { data: newUser, error: createError } = await admin.auth.admin.createUser({
-    email: formData.email,
-    password: formData.password,
-    email_confirm: true,
-    user_metadata: { full_name: formData.fullName },
-  });
-
-  if (createError) {
-    return { error: createError.message };
-  }
-
-  // Insert into users table using service role (bypasses RLS)
-  const { error: profileError } = await admin.from("users").insert({
-    id: newUser.user.id,
-    email: formData.email,
-    full_name: formData.fullName,
-  });
-
-  if (profileError) {
-    console.error("Profile creation error:", profileError);
-    // Non-blocking — user is already created
-  }
-
-  // Now sign in the user so they get a session
   const supabase = await createServerClient();
-  const { error: signInError } = await supabase.auth.signInWithPassword({
+
+  // Use regular signup (sends confirmation email if enabled, or auto-confirms)
+  const { data, error: signUpError } = await supabase.auth.signUp({
     email: formData.email,
     password: formData.password,
+    options: {
+      data: { full_name: formData.fullName },
+    },
   });
 
-  if (signInError) {
-    return { error: signInError.message };
+  if (signUpError) {
+    return { error: signUpError.message };
+  }
+
+  // If user was created and session exists, insert profile
+  if (data.user) {
+    // Use admin client for profile insert (bypasses RLS)
+    try {
+      const admin = createAdminClient();
+      await admin.from("users").insert({
+        id: data.user.id,
+        email: formData.email,
+        full_name: formData.fullName,
+      });
+    } catch {
+      // Non-blocking — user is already created in auth
+    }
   }
 
   return { error: null };
