@@ -18,34 +18,36 @@ export async function signUpUser(formData: {
   password: string;
   fullName: string;
 }) {
-  const supabase = await createServerClient();
+  const admin = createAdminClient();
 
-  // Use regular signup (sends confirmation email if enabled, or auto-confirms)
-  const { data, error: signUpError } = await supabase.auth.signUp({
+  // Create user with auto-confirm via admin API (no email confirmation needed)
+  const { data: newUser, error: createError } = await admin.auth.admin.createUser({
     email: formData.email,
     password: formData.password,
-    options: {
-      data: { full_name: formData.fullName },
-    },
+    email_confirm: true,
+    user_metadata: { full_name: formData.fullName },
   });
 
-  if (signUpError) {
-    return { error: signUpError.message };
+  if (createError) {
+    return { error: createError.message };
   }
 
-  // If user was created and session exists, insert profile
-  if (data.user) {
-    // Use admin client for profile insert (bypasses RLS)
-    try {
-      const admin = createAdminClient();
-      await admin.from("users").insert({
-        id: data.user.id,
-        email: formData.email,
-        full_name: formData.fullName,
-      });
-    } catch {
-      // Non-blocking — user is already created in auth
-    }
+  // Insert into users table
+  await admin.from("users").insert({
+    id: newUser.user.id,
+    email: formData.email,
+    full_name: formData.fullName,
+  });
+
+  // Sign in the user so they get a session cookie
+  const supabase = await createServerClient();
+  const { error: signInError } = await supabase.auth.signInWithPassword({
+    email: formData.email,
+    password: formData.password,
+  });
+
+  if (signInError) {
+    return { error: signInError.message };
   }
 
   return { error: null };
