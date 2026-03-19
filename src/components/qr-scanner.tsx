@@ -35,7 +35,7 @@ export function QrScanner({ onScan, paused }: QrScannerProps) {
           qrbox: { width: 250, height: 250 },
           aspectRatio: 1,
         },
-        (decodedText) => {
+        (decodedText: string) => {
           if (!pausedRef.current) {
             onScan(decodedText);
           }
