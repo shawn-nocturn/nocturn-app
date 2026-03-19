@@ -3,11 +3,12 @@ import { createClient } from "@/lib/supabase/server";
 import { createClient as createSupabaseClient } from "@supabase/supabase-js";
 import { DashboardShell } from "@/components/dashboard-shell";
 import { AskNocturnButton } from "@/components/ask-nocturn-button";
+import { SUPABASE_URL } from "@/lib/supabase/config";
 
 // Admin client for bypassing RLS on membership check
 function createAdminClient() {
   return createSupabaseClient(
-    process.env.NEXT_PUBLIC_SUPABASE_URL!,
+    SUPABASE_URL,
     process.env.SUPABASE_SERVICE_ROLE_KEY!,
     { auth: { autoRefreshToken: false, persistSession: false } }
   );

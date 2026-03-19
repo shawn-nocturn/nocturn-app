@@ -2,3 +2,8 @@
 export const SUPABASE_URL = "https://bpzwbqtpyorppijdblhy.supabase.co";
 export const SUPABASE_ANON_KEY =
   "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImJwendicXRweW9ycHBpamRibGh5Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzM3MTA3NzIsImV4cCI6MjA4OTI4Njc3Mn0.RAYfZJoeKaYQKpsDuLLywG3OSei8X6yJ2KQoNC5Hlp8";
+
+// Service role key — server-side only, never expose to client
+export const SUPABASE_SERVICE_ROLE_KEY =
+  process.env.SUPABASE_SERVICE_ROLE_KEY ||
+  ""; // Must be set in Vercel env vars — this is the only env var still needed
